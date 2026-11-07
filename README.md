@@ -1,5 +1,5 @@
 # Fairness Preservation under Computational Budgets in Probabilistic Decision Systems
-**ICT 5143 AFGML Capstone — Problem 9** · Team: **Shreeya Kamath (261090830022)**, **Misha (261090830020)** · UCI Bank Marketing (`bank-additional-full.csv`)
+**ICT 5143 AFGML Capstone — Problem 9** · Team: **Shreeya Kamath (261090830022)**,  · UCI Bank Marketing (`bank-additional-full.csv`)
 
 > **Status.** Real-data results (UCI file, SHA-256 in `data/README.md`, 5 seeds) are in `results/`. `results/smoke/` is a synthetic fixture run, kept only to demonstrate file formats; it is **not evidence**.
 
