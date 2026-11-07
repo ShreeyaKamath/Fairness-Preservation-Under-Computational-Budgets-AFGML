@@ -1,0 +1,70 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=0.78in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,amssymb,booktabs,tabularx,xcolor,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\newcommand{\fillin}[1]{\textnormal{[\textit{#1}]}}
+\newcommand{\ProjectTitle}{Fairness Preservation under Computational Budgets in Probabilistic Decision Systems}
+\begin{document}
+\begin{center}
+{\Large\bfseries \ProjectTitle}\\[4pt]
+ICT 5143: Algorithms Fairness and Graphical Models Laboratory\\
+Problem 9\\
+Shreeya Kamath, 261090830022; Misha, 261090830020\\
+{\small Repository: \url{https://github.com/ShreeyaKamath/Fairness-Preservation-and-Computational-Budgets-AFGML}\\
+Experiment-producing commit: \texttt{e2350bcd6d58361ddf3e4e7adcdc5d8383f586c2}; submission tag \texttt{submission}; Date: 7 November 2026}
+\end{center}
+\begin{abstract}
+\noindent We ask whether a budget-aware fallback limits the fairness loss when exact inference in a nine-variable Bayesian network for pre-contact bank outreach is cut off by an operation budget. On UCI Bank Marketing (test $n=8{,}238$), fairness-aware fallback selection reproduces exact decisions (AP $0.421$, $98.3\%$ agreement) but has a larger $\Delta_{\mathrm{EOpp}}$ than the global fallback by $+0.120$ $[0.015,0.226]$; our hypothesis is refuted. Simulation shows group-dependent evidence availability drives fallback disparity. Limits: strong base-rate drift, no customer identifiers, small network.
+\end{abstract}
+
+\section{Question, context and contribution}
+Customers, outreach teams, serving engineers and auditors are affected when a probabilistic scorer runs under a compute limit. $Y=1$: recorded term-deposit subscription; $D=1$: selection for \emph{hypothetical} outreach (top $20\%$ of scores) using only pre-contact information (call \texttt{duration} excluded).\\
+\textbf{Research question:} at a fixed operation budget, does choosing the fallback by validation worst-group deviation from the exact decision (AP loss $\le0.01$) yield a smaller $\Delta_{\mathrm{EOpp}}$ than a global fallback, utility-only selection and post-budget threshold adjustment? It is refuted if any Holm-adjusted paired interval contains $0$ or is positive.\\
+\textbf{Contribution:} a deterministic operation-count budget with evidence-dependent trips, a simulation isolating group-dependent evidence availability (with a no-dependence control), and the selection rule.\\
+\textbf{Closest work:} compute reduction causing group disparity in neural inference~\cite{closest}; our reproduced baseline is group-threshold post-processing~\cite{method}. Eight or more papers are compared in \texttt{docs/related\_work.md}.
+
+\section{Data, graphical model and fairness method}
+\textbf{Data and estimand:} \texttt{bank-additional-full.csv}~\cite{data} (41,188 contacts, 4,640 positives, SHA-256 recorded), date-ordered, no customer id; positional 60/20/20 split (24,712/8,238/8,238). Protected attributes: age band ($<30$, $30$--$59$, $\ge60$) crossed with marital status (audit only; not a model input). Groups with $<30$ positives are exploratory. \texttt{unknown} values are unobserved evidence; macro and calendar columns are excluded by declared choice.\\
+\textbf{Graph and inference:} a Dirichlet-smoothed (train-only) discrete Bayesian network, no latent variables; $A$ age band, $E$ education, $J$ job, $F$ default, $H$ housing, $L$ loan, $P_d,P_r$ prior-contact bins, $O$ previous outcome:
+\[
+p(\cdot)=p(A)\,p(E|A)\,p(J|A,E)\,p(F|J)\,p(H|A)\,p(L|H)\,p(P_d)\,p(P_r|P_d)\,p(O|P_r,P_d)\,p(Y|A,J,H,L,O,P_d),
+\]
+query $P(Y{=}1\mid e)$ with $e$ the observed variables. Exact variable elimination (min-fill, min-weight, min-degree) and clique-tree calibration (treewidth 6) were implemented with factor-entry operation counters.\\
+\textbf{Method and fairness:} a query whose exact cost would exceed the budget is answered from a precomputed table (prior, or a variable subset). The proposed rule picks, on validation data, the candidate with the smallest worst-group decision-flip rate relative to exact inference among those within the AP tolerance; routing is group-unaware. Primary criterion $\Delta_{\mathrm{EOpp}}$ (range of group TPRs; a missed responder is the harm); diagnostics $\Delta_{\mathrm{DP}}$, $\Delta_{\mathrm{EOdds}}$, flips, log loss, Brier. Primary utility: average precision (AP), allowed loss $0.01$. Age band is a model variable and so is used at prediction time; marital status is not.
+
+\section{Evaluation protocol}
+\textbf{Baselines:} exact inference (reference), global fallback (closest), threshold adjustment after budgeted inference, fair-adjusted exact, logistic regression and gradient-boosted trees on the same variables. Thresholds, tables and selection use train/validation only; the test protocol was frozen beforehand (\texttt{docs/protocol.md}). Budgets are operation counts at quantiles of natural validation cost; the primary $75\%$ quantile is $11$ operations ($258$ at $100\%$); wall-clock is measured separately. Capacity is $0.2$ (robustness $0.1$, $0.3$). Workloads: natural (real \texttt{unknown} pattern, confirmatory) and synthetic group-dependent / group-independent masks (exploratory). Five seeds cover masks, networks and GBT; the natural workload is deterministic. Intervals: fixed-model paired moving-block bootstrap over date-ordered test blocks (length $50$, $1{,}000$ replicates, $95\%$); Holm correction over the three confirmatory comparisons, computed on $\Delta_{\mathrm{EOpp}}$ over the $7$ groups with $\ge30$ positives. Ablations: utility-only selection, global fallback, no evidence-based simplification, generous budget. Robustness: elimination orders, network densities, discretisation, capacities, budgets, masks. Correctness: exact methods agree to $\le2.2\times10^{-16}$ (tolerance $10^{-6}$) on $600$ evidence patterns and unit tests in \texttt{tests/}.
+
+\section{Results and interpretation}
+\begin{center}\small
+\begin{tabularx}{\linewidth}{Xcccc}\toprule
+Method & AP $\uparrow$ & $\Delta_{\mathrm{EOpp}}$ $\downarrow$ & Worst-group flip $\downarrow$ & Log loss / Brier $\downarrow$\\\midrule
+Exact (reference) & 0.421 & 0.465 & 0 & 0.709 / 0.223\\
+Global fallback (closest baseline) & 0.350 & 0.303 & 0.303 & 0.852 / 0.260\\
+Proposed & 0.421 & 0.423 & 0.038 & 0.710 / 0.223\\
+Utility-only selection (ablation A1) & 0.354 & 0.717 & 0.198 & 0.825 / 0.254\\
+Threshold adj.\ after budget & 0.350 & 0.317 & 0.319 & 0.852 / 0.260\\\bottomrule
+\end{tabularx}
+\end{center}
+{\small \textbf{Table note:} natural workload, test $n=8{,}238$, 11-operation budget ($20.1\%$ of queries fall back), capacity $0.2$, one deterministic run. $\Delta_{\mathrm{EOpp}}$ over $7$ supported groups ($70$--$932$ positives each); $5$ exploratory groups ($1$--$8$ positives, $n=2$--$34$) excluded. Paired proposed $-$ comparator on $\Delta_{\mathrm{EOpp}}$ (negative favours proposed): global $+0.120$ $[0.015,0.226]$, Holm $p=0.036$; utility-only $-0.294$ $[-0.370,-0.210]$, $p=0.006$; threshold adj.\ $+0.106$ $[-0.006,0.251]$, $p=0.080$.}\\
+\textbf{Main finding:} the hypothesis is refuted. Proposed beats utility-only selection, but is worse than the global fallback and indistinguishable from threshold adjustment. The lower $\Delta_{\mathrm{EOpp}}$ of those two reflects levelling down: AP falls by $0.071$ (above the $0.01$ tolerance) and $15$--$18\%$ of decisions change, whereas proposed stays within tolerance ($98.3\%$ agreement). Against exact inference its $\Delta_{\mathrm{EOpp}}$ is lower by $0.042$ $[0.006,0.082]$: no budget-induced degradation, but the $0.465$ gap already exists in the exact model. The BN's AP is below logistic regression ($0.525$).\\
+\textbf{Mechanism and failure:} removing fairness-aware selection (A1) raises the worst-group flip rate from $0.038$ to $0.198$, as it picks the age-based fallback. Disabling simplification (A3) raises fallbacks to $26.2\%$, and a generous budget ($258$ operations) restores exact behaviour. In simulated networks the fallback-rate gap is $0.542$ under group-dependent availability versus $0.026$ in the control (difference $+0.516$; each width's interval excludes $0$), yet the $\Delta_{\mathrm{EOpp}}$ effect is uncertain at one width ($+0.069$ $[-0.041,0.179]$). Failure (synthetic dependent masks, exploratory): proposed chose the age-based fallback in $3$ of $5$ seeds (AP loss $0.046$; $\Delta_{\mathrm{EOpp}}$ $+0.493$ $[0.397,0.569]$ versus exact), while its group-unaware variant lost $0.003$ AP. It also degrades under dense and sparse networks (worst flip $0.206$, $0.133$).
+
+\section{Limitations, ethics and conclusion}
+Only the natural \texttt{unknown} pattern is real; masks and networks are simulations. The positive rate drifts across splits ($4.8\%$, $11.1\%$, $30.8\%$), so the validation threshold selects $38.3\%$ of test rows instead of $20\%$. Rows are not distinct customers, so intervals may be too narrow; five groups are exploratory and wide intervals do not show fairness. Contacted-only data say nothing about uncontacted people, and with nine variables exact inference is cheap, so budgets are relative. \textbf{Conclusion:} fairness-aware fallback selection preserves exact decisions at a tight budget but does not give the smallest $\Delta_{\mathrm{EOpp}}$; next, re-run under a re-split that equalises base rates and add worst-group TPR to expose levelling down.
+
+\section*{Reproducibility and individual contributions}
+\textbf{Reproduce:} \texttt{scripts/run\_experiments.py --mode real}, then \texttt{scripts/evaluate.py --out results}, then \texttt{scripts/make\_results.py --out results --mode real}; config: \texttt{configs/main.yaml}; Python 3.13, Linux, about 22 minutes, \texttt{requirements.txt}; commit \texttt{e2350bcd6d58}.\\
+\textbf{Shreeya Kamath:} implementation (inference, baselines, experiments, notebook) and slide alignment; checked the report and slide figures against \texttt{results/}. \textbf{Misha:} debugging, report writing and slides; re-ran the 93 tests and the exact-agreement and leakage checks on Shreeya's code. Details: \texttt{docs/contributions.md}.\\
+\textbf{Evidence:} \texttt{docs/requirements\_matrix.md}, \texttt{results/}.
+\begin{thebibliography}{9}\small
+\bibitem{closest} S.\ Das, M.\ Romanelli, F.\ Fioretto. Disparate Impact on Group Accuracy of Linearization for Private Inference. ICML 2024 (PMLR 235:10168--10184). arXiv:2402.03629.
+\bibitem{data} S.\ Moro, P.\ Rita, P.\ Cortez. Bank Marketing, UCI Machine Learning Repository, dataset 222. \url{https://archive.ics.uci.edu/dataset/222/bank+marketing}; accessed 7 Nov 2026.
+\bibitem{method} M.\ Hardt, E.\ Price, N.\ Srebro. Equality of Opportunity in Supervised Learning. NeurIPS 2016. arXiv:1610.02413.
+\end{thebibliography}
+\end{document}
